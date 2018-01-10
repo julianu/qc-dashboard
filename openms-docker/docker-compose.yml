@@ -1,0 +1,15 @@
+version: '3.2'
+services:
+  contrib:
+    build: contrib
+    image: "mwalzer/openms-contrib:v2.3.0"
+  library:
+    build: library
+    image: "mwalzer/openms-library-qcml:v0_10"
+    depends_on:
+      - contrib
+  multistage:
+    build: multistage
+    image: "mwalzer/openms-executables-qcml:v0_10"
+    depends_on:
+      - library
