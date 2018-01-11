@@ -1,7 +1,7 @@
 library(shinydashboard)
 library(jsonlite)
 library(DT)
-
+library(MASS)
 
 ######
 # select data for visualization (hard-coded now)
@@ -113,12 +113,11 @@ linePlotData <- function(plotData = c(), col = NULL) {
 
 
 
-
-
 # setting up the dashboard
 side_menu <- sidebarMenu(
   menuItem("Startpage", tabName = "startpage", icon = icon("dashboard")),
-  menuItem("nr of Identification", tabName = "nr_identifications_tab", icon = icon("line-chart"))
+  menuItem("nr of Identification", tabName = "nr_identifications_tab", icon = icon("line-chart")),
+  menuItem("PCA analysis", tabName = "pca_tab", icon = icon("cogs"))
 )
 
 # Define UI for app that draws a histogram ----
@@ -160,6 +159,14 @@ ui <- dashboardPage(
             plotOutput(outputId = "nrPSMsLineChart")
           )
         )
+      ),
+
+      tabItem(tabName = "pca_tab",
+        fluidRow(
+              box(plotOutput(outputId = "plotPcaScores")),
+              box(plotOutput(outputId = "plotPcaBi")),
+              box(plotOutput(outputId = "plotPcaScree"))
+          )
       )
 
     )
@@ -172,7 +179,7 @@ server <- function(input, output) {
 
 
   output$debugText <- renderText({
-    paste("hello, no debug",
+    paste("no debugging right now",
       collapse = "\n"
     )
   })
@@ -191,8 +198,8 @@ server <- function(input, output) {
   })
 
 
-  # render the number of proteins (QC:0000032)
-  output$nrProteinsLineChart <- renderPlot({
+  # model for data to be analyzed
+  dataSelected <- reactive({
     if (length(input$fileSelectTable_rows_selected) < 1) {
       # if nothing is selected, take all data
       qcfiles <- qcml_files
@@ -200,36 +207,57 @@ server <- function(input, output) {
       qcfiles <- qcml_files[sort(input$fileSelectTable_rows_selected)]
     }
 
-    proteinData <- getQcData(qcfiles = qcfiles, qcval = "QC:0000032")
-    #psmData <- getQcData(qcfiles = qcfiles, qcval = "QC:0000029")
+    nr_proteins_metric <- as.numeric(getQcData(qcfiles = qcfiles, qcval = "QC:0000032"))
+    nr_peptides_metric <- as.numeric(getQcData(qcfiles = qcfiles, qcval = "QC:0000030"))
+    nr_psms_metric <- as.numeric(getQcData(qcfiles = qcfiles, qcval = "QC:0000029"))
 
-    linePlotData(plotData = proteinData, col = "aquamarine4")
+    return(data.frame(nr_proteins_metric, nr_peptides_metric, nr_psms_metric))
+  })
+
+  # render the number of proteins (QC:0000032)
+  output$nrProteinsLineChart <- renderPlot({
+    linePlotData(plotData = dataSelected()[, "nr_proteins_metric"], col = "aquamarine4")
   })
 
   # render the number of peptides (QC:0000030)
   output$nrPeptidesLineChart <- renderPlot({
-    if (length(input$fileSelectTable_rows_selected) < 1) {
-      # if nothing is selected, take all data
-      qcfiles <- qcml_files
-    } else {
-      qcfiles <- qcml_files[sort(input$fileSelectTable_rows_selected)]
-    }
-
-    peptideData <- getQcData(qcfiles = qcfiles, qcval = "QC:0000030")
-    linePlotData(plotData = peptideData, col = "darkorange")
+    linePlotData(plotData = dataSelected()[, "nr_peptides_metric"], col = "darkorange")
   })
 
   # render the number of PSMs (QC:0000029)
   output$nrPSMsLineChart <- renderPlot({
-    if (length(input$fileSelectTable_rows_selected) < 1) {
-      # if nothing is selected, take all data
-      qcfiles <- qcml_files
-    } else {
-      qcfiles <- qcml_files[sort(input$fileSelectTable_rows_selected)]
+    linePlotData(plotData = dataSelected()[, "nr_psms_metric"], col = "firebrick3")
+  })
+
+
+  # calculating PCA data
+  pcaData <- reactive({
+    metrics.pca <- dataSelected()
+
+    robust.cov <- cov.rob(metrics.pca)      # robust covariance
+    robust.cor <- cov2cor(robust.cov$cov)   # correlation matrix
+    robust.cor.1 <- robust.cov
+    robust.cor.1$cov <- robust.cor
+    for (i in 1:ncol(metrics.pca)) {
+       robust.cor.1$center[i] <- robust.cov$center[i] / sqrt(robust.cov$cov[i, i])
+       metrics.pca[, i] <- metrics.pca[, i] / sqrt(robust.cov$cov[i, i])
     }
 
-    psmsData <- getQcData(qcfiles = qcfiles, qcval = "QC:0000029")
-    linePlotData(plotData = psmsData, col = "firebrick3")
+    return(princomp(metrics.pca, covmat = robust.cor.1, scores = T))
+  })
+
+  # plotting PCA data
+  output$plotPcaScree <- renderPlot({
+     plot(pcaData(), main = "Scree plot")
+  })
+
+  output$plotPcaBi <- renderPlot({
+     biplot(pcaData(), main = "Biplot")
+  })
+
+  output$plotPcaScores <- renderPlot({
+     plot(pcaData()$scores[,1], pcaData()$scores[,2],
+          main = "PCA scores", xlab = "PC1", ylab = "PC2")
   })
 }
 
