@@ -1,116 +1,13 @@
 library(shinydashboard)
-library(jsonlite)
+
 library(DT)
 library(MASS)
 
-######
-# select data for visualization (hard-coded now)
-######
-qcml_files <- c(
-  "C_elegans_LS_01_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_02_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_03_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_04_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_05_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_06_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_07_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_08_run1_07Nov13_Pippin_13-06-18.qcML",
-  "C_elegans_LS_09_run1_07Nov13_Pippin_13-06-18.qcML"
-)
+# source the way, how the qc data is retrieved
+source("./qc_data_retriever/static_json_impl/static_json.R")
 
-
-# parse actual data from json files (for now)
-json_files_elegans_QC_0000029 <- c(
-  "./json_examples/elegans_01_QC_0000029.json",
-  "./json_examples/elegans_02_QC_0000029.json",
-  "./json_examples/elegans_03_QC_0000029.json",
-  "./json_examples/elegans_04_QC_0000029.json",
-  "./json_examples/elegans_05_QC_0000029.json",
-  "./json_examples/elegans_06_QC_0000029.json",
-  "./json_examples/elegans_07_QC_0000029.json",
-  "./json_examples/elegans_08_QC_0000029.json",
-  "./json_examples/elegans_09_QC_0000029.json"
-)
-qc_data_QC_0000029 <- c();
-for (i in 1:length(json_files_elegans_QC_0000029)) {
-  qc_data_QC_0000029[i] <- fromJSON(txt=json_files_elegans_QC_0000029[i])$"QC:0000029"
-}
-
-json_files_elegans_QC_0000030 <- c(
-  "./json_examples/elegans_01_QC_0000030.json",
-  "./json_examples/elegans_02_QC_0000030.json",
-  "./json_examples/elegans_03_QC_0000030.json",
-  "./json_examples/elegans_04_QC_0000030.json",
-  "./json_examples/elegans_05_QC_0000030.json",
-  "./json_examples/elegans_06_QC_0000030.json",
-  "./json_examples/elegans_07_QC_0000030.json",
-  "./json_examples/elegans_08_QC_0000030.json",
-  "./json_examples/elegans_09_QC_0000030.json"
-)
-qc_data_QC_0000030 <- c();
-for (i in 1:length(json_files_elegans_QC_0000030)) {
-  qc_data_QC_0000030[i] <- fromJSON(txt=json_files_elegans_QC_0000030[i])$"QC:0000030"
-}
-
-json_files_elegans_QC_0000032 <- c(
-  "./json_examples/elegans_01_QC_0000032.json",
-  "./json_examples/elegans_02_QC_0000032.json",
-  "./json_examples/elegans_03_QC_0000032.json",
-  "./json_examples/elegans_04_QC_0000032.json",
-  "./json_examples/elegans_05_QC_0000032.json",
-  "./json_examples/elegans_06_QC_0000032.json",
-  "./json_examples/elegans_07_QC_0000032.json",
-  "./json_examples/elegans_08_QC_0000032.json",
-  "./json_examples/elegans_09_QC_0000032.json"
-)
-qc_data_QC_0000032 <- c();
-for (i in 1:length(json_files_elegans_QC_0000032)) {
-  qc_data_QC_0000032[i] <- fromJSON(txt=json_files_elegans_QC_0000032[i])$"QC:0000032"
-}
-
-# this function gets the qcval as fson from the given source (which is hard
-# coded for now and in the json examplke file) and the actual files (which are
-# mapped for now).
-# source might later on be something like eiher the qcML files or a database
-getQcData <- function(source = NULL, qcfiles = c(), qcval = NULL) {
-  values <- c();
-  for (file in qcfiles) {
-    values <- c(values, getQcDataForFile(file, qcval))
-  }
-
-  return(values)
-}
-
-# almost everything hard coded for now
-getQcDataForFile <- function(qcfile = NULL, qcval = NULL) {
-  idx = match(qcfile, qcml_files, nomatch = -1)
-  retval <- NaN
-  if (idx > 0) {
-    if (qcval == "QC:0000029") {
-      retval <- qc_data_QC_0000029[idx]
-    } else if (qcval == "QC:0000030") {
-      retval <- qc_data_QC_0000030[idx]
-    } else if (qcval == "QC:0000032") {
-      retval <- qc_data_QC_0000032[idx]
-    }
-  }
-  return(retval)
-}
-
-
-# function for plotting the data as lines
-# a standalone-function to make all plots look (and behave) similir
-linePlotData <- function(plotData = c(), col = NULL) {
-  plot(x = c(1:length(plotData)),
-    y = plotData,
-    type = "l",
-    xlab="",
-    ylab="",
-    col=col,
-    lwd=3
-  )
-}
-
+# source in the plots
+source("./visualisations/lineplots.R")
 
 
 # setting up the dashboard
@@ -120,7 +17,7 @@ side_menu <- sidebarMenu(
   menuItem("PCA analysis", tabName = "pca_tab", icon = icon("cogs"))
 )
 
-# Define UI for app that draws a histogram ----
+# define UI for the dashboard
 ui <- dashboardPage(
   dashboardHeader(title = "EuBIC QC"),
   dashboardSidebar(side_menu),
@@ -177,7 +74,6 @@ ui <- dashboardPage(
 # Define server logic required to draw a histogram ----
 server <- function(input, output) {
 
-
   output$debugText <- renderText({
     paste("no debugging right now",
       collapse = "\n"
@@ -216,17 +112,17 @@ server <- function(input, output) {
 
   # render the number of proteins (QC:0000032)
   output$nrProteinsLineChart <- renderPlot({
-    linePlotData(plotData = dataSelected()[, "nr_proteins_metric"], col = "aquamarine4")
+    linePlotWithMeanData(plotData = dataSelected()[, "nr_proteins_metric"], col = "aquamarine4")
   })
 
   # render the number of peptides (QC:0000030)
   output$nrPeptidesLineChart <- renderPlot({
-    linePlotData(plotData = dataSelected()[, "nr_peptides_metric"], col = "darkorange")
+    linePlotWithMeanData(plotData = dataSelected()[, "nr_peptides_metric"], col = "darkorange")
   })
 
   # render the number of PSMs (QC:0000029)
   output$nrPSMsLineChart <- renderPlot({
-    linePlotData(plotData = dataSelected()[, "nr_psms_metric"], col = "firebrick3")
+    linePlotWithMeanData(plotData = dataSelected()[, "nr_psms_metric"], col = "firebrick3")
   })
 
 
